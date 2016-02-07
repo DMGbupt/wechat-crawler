@@ -54,7 +54,7 @@ class IndexSpider(Spider):
             self.end_time = datetime.now()  # 默认值：当前时刻
         # 爬取模式，1为全量抓取，2为增量抓取
         if crawl_mode:
-            self.crawl_mode = crawl_mode
+            self.crawl_mode = int(crawl_mode)
         else:
             self.crawl_mode = 2 # 默认值：增量抓取
 

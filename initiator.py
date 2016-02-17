@@ -30,24 +30,32 @@ if __name__ == "__main__":
         idx = sys.argv.index("-s")
         start_time = datetime.strptime(sys.argv[idx+1], "%Y/%m/%d/%H:%M:%S")
     if "-c" in sys.argv:  # 从数据库读取距现在最近的爬取时间作为启动时间
-            # 此选项用于宕机重启，目前的做法不能保证宕机前最后一次爬取完成，会漏掉一部分新闻
-            conn = MySQLdb.connect(**DB_CONFIG)
-            cur = conn.cursor()
-            cur.execute("select max(create_time) from media_info")
-            start_time = cur.fetchone()[0]
-    if "-m" in sys.argv:
+        # 此选项用于宕机重启，目前的做法不能保证宕机前最后一次爬取完成，会漏掉一部分新闻
+        conn = MySQLdb.connect(**DB_CONFIG)
+        cur = conn.cursor()
+        cur.execute("select max(create_time) from media_info")
+        start_time = cur.fetchone()[0]
+    if "-o" in sys.argv: # 按照各个公众号已爬文章数目递增的顺序来确定公众号的爬取顺序，确保已爬文章少的公众号能被优先爬取
+        conn = MySQLdb.connect(**DB_CONFIG)
+        cur = conn.cursor()
+        cur.execute("select media_id from media_info group by media_id order by count(1)")
+        result = cur.fetchall()
+        search_order = [x[0] for x in result]
+    if "-m" in sys.argv: # 爬取模式
         idx = sys.argv.index("-m")
         crawl_mode =sys.argv[idx+1]
 
     while True:
-        random.shuffle(WECHAT_LIST) # 随机排列待抓取公众号
-        end_time = datetime.now()  # 默认起始时间：爬虫启动时
+        end_time = datetime.now()  # 默认截止时间：爬虫启动时
         if not start_time:
-            start_time = datetime.now()-timedelta(days=365)
+            start_time = datetime.now()-timedelta(days=100) # 默认开始时间，100天以前
+        if not search_order:
+            search_order = range(1,51)
+            random.shuffle(search_order) # 默认随机排列待抓取公众号
         if not crawl_mode:
             crawl_mode = 1 # 默认全量抓取
-        for query in WECHAT_LIST:
+        for ind in search_order:
             pool = Pool(processes=1) # 进程池，由于公众号的反爬限制较严，限制为单进程
-            pool.apply(crawl, args=('wechat', query, start_time, end_time, crawl_mode))
+            pool.apply(crawl, args=('wechat', WECHAT_LIST[ind-1], start_time, end_time, crawl_mode))
             pool.close()
             pool.join()

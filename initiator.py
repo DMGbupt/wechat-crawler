@@ -14,7 +14,6 @@ from scrapy.crawler import CrawlerProcess
 from scrapy.utils.project import get_project_settings
 from crawlers.settings import DB_CONFIG
 from crawlers.logs.crawler_logger import spider_logger
-from crawlers.topics.wechat import WECHAT_LIST
 
 def crawl(spiders, query, start, end, mode):
     spider_logger.info("Start crawling {0} from {1} to {2}".format(query, start, end))
@@ -25,6 +24,7 @@ def crawl(spiders, query, start, end, mode):
 if __name__ == "__main__":
     # 时间
     start_time = None
+    gzh_order = None
     crawl_mode = None
     if "-s" in sys.argv: # 传入start_time
         idx = sys.argv.index("-s")
@@ -35,12 +35,15 @@ if __name__ == "__main__":
         cur = conn.cursor()
         cur.execute("select max(create_time) from media_info")
         start_time = cur.fetchone()[0]
+        cur.close()
     if "-o" in sys.argv: # 按照各个公众号已爬文章数目递增的顺序来确定公众号的爬取顺序，确保已爬文章少的公众号能被优先爬取
+        # 此选项仅会爬取在数据库中有文章记录数的公众号，所以新加入的公众号需要爬取历史数据后才能被该选项爬取到
         conn = MySQLdb.connect(**DB_CONFIG)
         cur = conn.cursor()
-        cur.execute("select media_id from media_info group by media_id order by count(1)")
+        cur.execute("select a.name from media as a right join media_info as b on a.id=b.media_id group by b.media_id order by count(1)")
         result = cur.fetchall()
-        search_order = [x[0] for x in result]
+        gzh_order = [x[0] for x in result]
+        cur.close()
     if "-m" in sys.argv: # 爬取模式
         idx = sys.argv.index("-m")
         crawl_mode =sys.argv[idx+1]
@@ -49,13 +52,18 @@ if __name__ == "__main__":
         end_time = datetime.now()  # 默认截止时间：爬虫启动时
         if not start_time:
             start_time = datetime.now()-timedelta(days=100) # 默认开始时间，100天以前
-        if not search_order:
-            search_order = range(1,51)
-            random.shuffle(search_order) # 默认随机排列待抓取公众号
+        if not gzh_order:
+            conn = MySQLdb.connect(**DB_CONFIG)
+            cur = conn.cursor()
+            cur.execute("select name from media")
+            result = cur.fetchall()
+            gzh_order = [x[0] for x in result]
+            random.shuffle(gzh_order) # 默认随机排列待抓取公众号
+            cur.close()
         if not crawl_mode:
             crawl_mode = 1 # 默认全量抓取
-        for ind in search_order:
+        for query in gzh_order:
             pool = Pool(processes=1) # 进程池，由于公众号的反爬限制较严，限制为单进程
-            pool.apply(crawl, args=('wechat', WECHAT_LIST[ind-1], start_time, end_time, crawl_mode))
+            pool.apply(crawl, args=('wechat', query, start_time, end_time, crawl_mode))
             pool.close()
             pool.join()

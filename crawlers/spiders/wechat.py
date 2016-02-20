@@ -47,8 +47,12 @@ class Wechat(IndexSpider):
                 item['url'] = url
             item['title'] = re.split(
                 "title><!.CDATA.|..></title", result)[1].encode('utf8')
-            item['digest'] = re.split(
-                "content168><!.CDATA.|..></content168", result)[1]
+            try:
+                # 部分文章内容全部由图构成，没有文本摘要，在json数据中没有<content168>标签（即摘要信息），此时爬取的摘要默认为空
+                item['digest'] = re.split("content168><!.CDATA.|..></content168", result)[1]
+            except Exception, e:
+                spider_logger.info("One digest is lacking in article from %s ! Set default value null." % response.url)
+                item['digest'] = ""
             publish_time = re.split("date><!.CDATA.|..></date", result)[1]
             item['publish_time'] = datetime.strptime(
                 publish_time+" 00:00:00", "%Y-%m-%d %H:%M:%S")

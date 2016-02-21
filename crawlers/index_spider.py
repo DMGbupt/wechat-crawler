@@ -27,13 +27,13 @@ class IndexSpider(Spider):
                  query=None,
                  start_time=None,
                  end_time=None,
-                 crawl_mode=None):
+                 index_pages=None):
         """
         @summary: 用于向爬虫传递参数, 请注意默认参数仅供测试使用
         @param query: 搜索词,单个公众号名称
         @param start_time: 仅爬取发布时间在start_time之后的网页，须保证目录页面中的网页以时间排序。
         @param end_time: 仅爬取发布时间在end_time之前的网页
-        @param crawl_mode: 爬取模式
+        @param index_pages: 指定爬取目录页数，默认全爬
         """
         # 搜索词，为了减小反爬概率，每次只搜索一条公众号并爬取
         if query:
@@ -52,11 +52,11 @@ class IndexSpider(Spider):
             self.end_time = end_time
         else:
             self.end_time = datetime.now()  # 默认值：当前时刻
-        # 爬取模式，1为全量抓取，2为增量抓取
-        if crawl_mode:
-            self.crawl_mode = int(crawl_mode)
+        # 爬取的目录页数
+        if index_pages:
+            self.index_pages = int(index_pages)
         else:
-            self.crawl_mode = 2 # 默认值：增量抓取
+            self.index_pages = 10 # 默认值：10页
 
     def start_requests(self):
         """

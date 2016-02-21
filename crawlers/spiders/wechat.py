@@ -51,7 +51,7 @@ class Wechat(IndexSpider):
                 # 部分文章内容全部由图构成，没有文本摘要，在json数据中没有<content168>标签（即摘要信息），此时爬取的摘要默认为空
                 item['digest'] = re.split("content168><!.CDATA.|..></content168", result)[1]
             except Exception, e:
-                spider_logger.info("One digest is lacking in article from %s ! Set default value null." % response.url)
+                spider_logger.info("Digest data lack in %s ! Set default value null." % response.url)
                 item['digest'] = ""
             publish_time = re.split("date><!.CDATA.|..></date", result)[1]
             item['publish_time'] = datetime.strptime(
@@ -76,19 +76,17 @@ class Wechat(IndexSpider):
         decoded_json = json.loads(response.body[idx1: idx2+1].strip())
         # 总共可爬取的目录页数
         totalPages = int(decoded_json['totalPages'])
-        # 当前所爬的页码
+        # 当前所爬页码
         page = int(decoded_json['page'])
-        # 增量抓取模式使用，设置要抓取的最大页码数
-        crawlpage = 1
-        # 如果是全量抓取，则比较当前页码与totalPages大小；如果是增量抓取，则比较当前页码与crawlpage、totalPages中的较小者
-        if page < (totalPages if self.crawl_mode == 1 else(crawlpage if crawlpage<totalPages else totalPages)):
+        # 比较当前页码与指定爬取的目录页数的大小（先比较了指定爬取的目录页数与总共可爬取的目录页数，避免越界）
+        if page < (self.index_pages if self.index_pages<=totalPages else totalPages):
             attr = re.split("=|&", response.url)
             term = attr[1]
             passwd = attr[3]
             nextpage = page+1
             return r"http://weixin.sogou.com/gzhjs?openid={}&ext={}&cb=sogou.weixin_gzhcb&page={}&gzhArtKeyWord=".format(term, passwd, nextpage)
         else:
-            # 当前页码已达到本次设置的最后一页（不论哪个模式），返回空
+            # 当前页码已达到本次设置爬取的最后一页，返回空
             spider_logger.info("No pages after {0}!".format(response.url))
             return
 

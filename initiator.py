@@ -41,7 +41,7 @@ if __name__ == "__main__":
             result = cur.fetchall()
             gzh_order = [x[0] for x in result]
             cur.close()
-        elif "-p" in sys.argv: # "p" for publish time: 按照各个公众号已爬文章里的最新发布时间递增顺序来确定公众号的爬取顺序，确保距离上次爬取时间较长的公众号能被优先爬取
+        elif "-p" in sys.argv: # "p" for publish time: 按照各个公众号已爬文章里的最新发布时间递增顺序来确定公众号的爬取顺序，确保距离上次爬取间隔较长的公众号能被优先爬取
             # 此选项仅会爬取在数据库中有文章记录数的公众号，所以新加入的公众号需先爬取历史数据后才能被该选项爬取到
             conn = MySQLdb.connect(**DB_CONFIG)
             cur = conn.cursor()
@@ -60,12 +60,12 @@ if __name__ == "__main__":
         for gzh_id in gzh_order:
             # 设置各个公众号的爬取起止时间
             end_time = datetime.now()  # 默认截止时间：爬虫启动时
-            if "-s" in sys.argv: # "s" for start time: 传入start_time字符串，需按照%Y/%m/%d/%H:%M:%S格式
+            if "-s" in sys.argv: # "s" for start time: 传入起始时间字符串，需按照%Y/%m/%d/%H:%M:%S格式
                 idx = sys.argv.index("-s")
                 start_time = datetime.strptime(sys.argv[idx+1], "%Y/%m/%d/%H:%M:%S")
             elif "-c" in sys.argv:  # "c" for continue: 从数据库读取待爬公众号距现在最近的文章发布时间的之前一天作为启动时间，达到持续更新的效果
                 # 此选项适用于每轮爬取周期较短时，每个公众号积累的文章数较少，可以一次爬完。若积累文章数较多，则爬取时可能被反爬，会漏掉一些文章
-                # 目前不推荐使用，所以才用爬取模式crawl_mode来替代它的效果
+                # 目前不推荐使用，所以才用"-t"参数指定爬取的目录页数来替代它的效果
                 conn = MySQLdb.connect(**DB_CONFIG)
                 cur = conn.cursor()
                 cur.execute("""select max(publish_time) from media_info where media_id=%s""",(unicode(gzh_id),))
@@ -73,7 +73,7 @@ if __name__ == "__main__":
                 start_time = lasttime-timedelta(days=1) # 由于数据库里文章的发布时间均是0点，为防止上次爬取当天更新的文章被忽略，需把起始时间提前一天
                 cur.close()
             else:
-                start_time = end_time-timedelta(days=365) # 默认开始时间，一年之前
+                start_time = end_time-timedelta(days=365) # 默认起始时间，一年之前
             conn = MySQLdb.connect(**DB_CONFIG)
             cur = conn.cursor()
             cur.execute("""select name from media where id=%s""",(unicode(gzh_id),))
